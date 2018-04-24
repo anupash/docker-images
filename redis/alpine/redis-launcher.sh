@@ -28,6 +28,8 @@
 # During normal operation, there should be only one redis-role=master pod. If it fails, the Sentinels
 # will nominate a new master and change all the redis-role values appropriately.
 
+set -x
+
 echo "Starting redis launcher"
 echo "Setting labels"
 label-updater.sh & plabeler=$!
@@ -40,8 +42,8 @@ SLAVE_CONF=/etc/redis/slave.conf
 
 # Adapt to dynamically named env vars
 ENV_VAR_PREFIX=`echo $REDIS_CHART_PREFIX|awk '{print toupper($0)}'|sed 's/-/_/g'`
-PORTVAR="${ENV_VAR_PREFIX}MASTER_SVC_SERVICE_PORT"
-HOSTVAR="${ENV_VAR_PREFIX}MASTER_SVC_SERVICE_HOST"
+PORTVAR="${ENV_VAR_PREFIX}MASTER_SERVICE_PORT"
+HOSTVAR="${ENV_VAR_PREFIX}MASTER_SERVICE_HOST"
 MASTER_LB_PORT="${!PORTVAR}"
 MASTER_LB_HOST="${!HOSTVAR}"
 QUORUM=${QUORUM:-2}
