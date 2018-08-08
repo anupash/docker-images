@@ -18,7 +18,7 @@ FROM alpine:edge
 ADD https://storage.googleapis.com/kubernetes-release/release/v1.9.2/bin/linux/amd64/kubectl /usr/local/bin/kubectl
 RUN chmod +x /usr/local/bin/kubectl
 
-RUN apk add --no-cache bash sed curl redis=4.0.10-r0 ca-certificates
+RUN apk add --no-cache bash sed curl redis=4.0.10-r1 ca-certificates
 RUN rm -rf /var/cache/apk/*
 
 COPY redis-master.conf /etc/redis/master.conf
