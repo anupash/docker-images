@@ -70,7 +70,7 @@ function launchmaster() {
   # First, find the own memory cgroup by iterating over all cgroups.
   MEMORY_LIMIT_BY_CGROUP=$(cat $(dirname $(find /sys/fs/cgroup/memory/ -name "tasks"|xargs grep -l ^1$))/memory.limit_in_bytes)
   MEMORY_LIMIT=$(( $MEMORY_LIMIT_BY_CGROUP * 98 /100 )) # 98% of allowed memory
-  sed -i "s/# maxmemory .*/maxmemory $MEMORY_LIMIT/" /etc/redis.conf
+  sed -i "s/# maxmemory .*/maxmemory $MEMORY_LIMIT/" $MASTER_CONF
 
   redis-server $MASTER_CONF --protected-mode no $@
 }
@@ -152,7 +152,7 @@ function launchslave() {
   # First, find the own memory cgroup by iterating over all cgroups.
   MEMORY_LIMIT_BY_CGROUP=$(cat $(dirname $(find /sys/fs/cgroup/memory/ -name "tasks"|xargs grep -l ^1$))/memory.limit_in_bytes)
   MEMORY_LIMIT=$(( $MEMORY_LIMIT_BY_CGROUP * 98 /100 )) # 98% of allowed memory
-  sed -i "s/# maxmemory .*/maxmemory $MEMORY_LIMIT/" /etc/redis.conf
+  sed -i "s/# maxmemory .*/maxmemory $MEMORY_LIMIT/" $SLAVE_CONF
 
   redis-server $SLAVE_CONF --protected-mode no $@
 }
