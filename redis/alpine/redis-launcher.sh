@@ -153,6 +153,54 @@ function launchslave() {
   redis-server $SLAVE_CONF --protected-mode no $@
 }
 
+function get_masters_in_running_state() {
+  kubectl get pod -o jsonpath='{range .items[*]}{.metadata.name} {..podIP} {.status.containerStatuses[0].state}{"\n"}{end}' -l redis-role=master|sed '/^\s*$/d'|grep running|grep $REDIS_CHART_PREFIX|cut -d ' ' -f 1
+}
+
+function get_masters_in_ready_state() {
+  kubectl get pod -o jsonpath='{range .items[*]}{.metadata.name} {..podIP} {.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' -l redis-role=master | sed '/^\s*$/d'| grep True|grep $REDIS_CHART_PREFIX|cut -d ' ' -f 1
+}
+
+function start_pod_as_master() {
+  echo "No masters found: \"$MASTERS_READY\" Electing first master..."
+  SLAVE1=`kubectl get pod -o jsonpath='{range .items[*]}{.metadata.creationTimestamp} {.metadata.name} {.status.conditions[?(@.type=="Ready")].status} {"\n"} {end}' -l redis-node=true |grep True|sort|awk '{print $2}'|grep $REDIS_CHART_PREFIX|head -n1`
+  if [[ "$SLAVE1" == "$HOSTNAME" ]] || [[ "$SLAVE1" == "" ]]; then
+    echo "Taking master role"
+    launchmaster
+  else
+    echo "Electing $SLAVE1 master"
+    launchslave
+  fi
+  exit 0
+}
+
+function start_pod_as_slave() {
+  if [ $COUNT_MASTERS_READY -gt 1 ]; then
+    echo "Found multiple pods running as redis master "$MASTERS_RUNNING
+    MASTERS_TO_BE_DEMOTED=`echo $MASTERS_READY| tail -n +2`
+    for i in $MASTERS_TO_BE_DELETED; do kubectl label --overwrite pod $i redis-role="slave"; done
+  fi
+
+  echo "Found $MASTERS_READY"
+  echo "Launching Redis in Slave mode"
+  launchslave
+  exit 0
+}
+
+function wait_for_masters_to_get_ready() {
+  MASTERS_READY=$(get_masters_in_ready_state)
+  COUNT_MASTERS_READY=`echo $MASTERS_READY|wc -w`
+
+  FAILURES=3;
+  while [ $FAILURES -gt 0 ] && [ $COUNT_MASTERS_READY -le 0 ]; do
+    echo "Waiting for pods running as master to get READY";
+    sleep $(( ( RANDOM % 10 )  + 5 )); # Sleep for a random number of second between 5 and 15
+    MASTERS_READY=$(get_masters_in_ready_state)
+    COUNT_MASTERS_READY=`echo $MASTERS_READY|wc -w`
+    FAILURES=$(( $FAILURES - 1 ))
+  done
+}
+
 #Check if MASTER environment variable is set
 if [[ "${MASTER}" == "true" ]]; then
   echo "Launching Redis in Master mode"
@@ -164,29 +212,36 @@ fi
 if [[ "${SENTINEL}" == "true" ]]; then
   echo "Launching Redis Sentinel"
   launchsentinel
-  echo "Launcsentinel action completed"
+  echo "Launch sentinel action completed"
   exit 0
 fi
 
+# Random Back-Off to fight Kubernetes spawning multiple redis server at the same time
+# Choosing 8 because we have maximum of 8 nodes in production
+# Sleeping for a random value in the range of 2 to 18 seconds
+echo "Random backoff before start of redis"
+sleep $(( ( RANDOM % 8 )*4  + 1 ));
+
 # Determine whether this should be a master or slave instance
 echo "Looking for pods running as master"
-MASTERS=`kubectl get pod -o jsonpath='{range .items[*]}{.metadata.name} {..podIP} {.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' -l redis-role=master | grep True|grep $REDIS_CHART_PREFIX`
-if [[ "$MASTERS" == "" ]]; then
-  echo "No masters found: \"$MASTERS\" Electing first master..."
-  SLAVE1=`kubectl get pod -o jsonpath='{range .items[*]}{.metadata.creationTimestamp} {.metadata.name} {.status.conditions[?(@.type=="Ready")].status} {"\n"} {end}' -l redis-node=true |grep True|sort|awk '{print $2}'|grep $REDIS_CHART_PREFIX|head -n1`
-  if [[ "$SLAVE1" == "$HOSTNAME" ]] || [[ "$SLAVE1" == "" ]]; then
-    echo "Taking master role"
-    launchmaster
-  else
-    echo "Electing $SLAVE1 master"
-    launchslave
-  fi
-  exit 0
+MASTERS_RUNNING=$(get_masters_in_running_state)
+COUNT_MASTERS_RUNNING=`echo $MASTERS_RUNNING|wc -w`
+
+if [ $COUNT_MASTERS_RUNNING -eq 0 ]; then
+  echo "Found no pods running as redis master"
+  start_pod_as_master
+elif [ $COUNT_MASTERS_RUNNING -gt 1 ]; then
+  echo "Found multiple pods running as redis master "$MASTERS_RUNNING
+fi
+
+sleep 5;
+
+wait_for_masters_to_get_ready
+
+if [[ "$MASTERS_READY" == "" ]]; then
+  start_pod_as_master
 else
-  echo "Found $MASTERS"
-  echo "Launching Redis in Slave mode"
-  launchslave
-  exit 0
+  start_pod_as_slave
 fi
 
 echo "Launching Redis in Slave mode"
