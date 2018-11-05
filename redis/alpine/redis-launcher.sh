@@ -219,8 +219,8 @@ fi
 # Random Back-Off to fight Kubernetes spawning multiple redis server at the same time
 # Choosing 8 because we have maximum of 8 nodes in production
 # Sleeping for a random value in the range of 2 to 18 seconds
-echo "Random backoff before start of redis"
-sleep $(( ( RANDOM % 8 )*4  + 1 ));
+# echo "Random backoff before start of redis"
+# sleep $(( ( RANDOM % 8 )*4  + 1 ));
 
 # Determine whether this should be a master or slave instance
 echo "Looking for pods running as master"
