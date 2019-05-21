@@ -15,7 +15,7 @@
 FROM alpine:latest
 
 # Add kubectl to enable sentinels to change labels during promotion
-ADD https://storage.googleapis.com/kubernetes-release/release/v1.11.2/bin/linux/amd64/kubectl /usr/local/bin/kubectl
+ADD https://storage.googleapis.com/kubernetes-release/release/v1.14.1/bin/linux/amd64/kubectl /usr/local/bin/kubectl
 
 # Copy config files and redis launcher script
 COPY redis-master.conf /etc/redis/master.conf
@@ -37,7 +37,7 @@ RUN set -ex \
             bash \
             sed \
             curl \
-            redis=4.0.11-r0 \
+            redis=4.0.12-r0 \
             ca-certificates \
             tzdata \
     \
